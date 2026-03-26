@@ -17,27 +17,30 @@ export default function Register() {
     setError('')
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!form.name || !form.email || !form.password || !form.confirm) {
-      setError('Veuillez remplir tous les champs.')
-      return
-    }
-    if (form.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.')
-      return
-    }
-    if (form.password !== form.confirm) {
-      setError('Les mots de passe ne correspondent pas.')
-      return
-    }
-
-    setLoading(true)
-    setTimeout(() => {
-      register({ name: form.name, email: form.email })
-      navigate('/dashboard')
-    }, 800)
+  const handleSubmit = async (e) => {
+  e.preventDefault()
+  if (!form.name || !form.email || !form.password || !form.confirm) {
+    setError('Veuillez remplir tous les champs.')
+    return
   }
+  if (form.password.length < 6) {
+    setError('Le mot de passe doit contenir au moins 6 caractères.')
+    return
+  }
+  if (form.password !== form.confirm) {
+    setError('Les mots de passe ne correspondent pas.')
+    return
+  }
+  setLoading(true)
+  try {
+    await register(form.name, form.email, form.password)
+    navigate('/dashboard')
+  } catch (err) {
+    setError(err.message || 'Erreur lors de la création du compte.')
+  } finally {
+    setLoading(false)
+  }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4">

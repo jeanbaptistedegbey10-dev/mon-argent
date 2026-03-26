@@ -18,26 +18,22 @@ export default function Login() {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-
-    // Validation basique
-    if (!form.email || !form.password) {
-      setError('Veuillez remplir tous les champs.')
-      return
-    }
-
-    setLoading(true)
-
-    // Simulation d'une requête (on remplacera par Supabase plus tard)
-    setTimeout(() => {
-      login({
-        name: 'Marie Dupont',
-        email: form.email,
-      })
-      navigate('/dashboard')
-    }, 800)
+  e.preventDefault()
+  setError('')
+  if (!form.email || !form.password) {
+    setError('Veuillez remplir tous les champs.')
+    return
   }
+  setLoading(true)
+  try {
+    await login(form.email, form.password)
+    navigate('/dashboard')
+  } catch (err) {
+    setError('Email ou mot de passe incorrect.')
+  } finally {
+    setLoading(false)
+  }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 flex items-center justify-center p-4">
