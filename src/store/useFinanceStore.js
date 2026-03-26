@@ -22,8 +22,9 @@ const useFinanceStore = create((set, get) => ({
     ])
 
     // Si première connexion : insérer données par défaut
-    if (cat.data?.length === 0) await get().seedDefaultData(user.id)
-
+    if (cat.data?.length === 0 && acc.data?.length === 0) {
+  await get().seedDefaultData(user.id)
+}
     set({
       transactions: tx.data  || [],
       accounts:     acc.data || [],
@@ -175,6 +176,17 @@ const useFinanceStore = create((set, get) => ({
     if (error) throw error
     set(state => ({ categories: state.categories.filter(c => c.id !== id) }))
   },
+
+  // Calcule le montant dépensé par catégorie depuis les vraies transactions
+getSpentByCategory: () => {
+  const { transactions } = get()
+  return transactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, t) => {
+      acc[t.cat] = (acc[t.cat] || 0) + Number(t.amount)
+      return acc
+    }, {})
+},
 
   // ── BUDGETS ─────────────────────────────────────────────────
   addBudget: async (budget) => {
