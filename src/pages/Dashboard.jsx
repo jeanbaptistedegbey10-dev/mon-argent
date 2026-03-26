@@ -27,6 +27,8 @@ const donutData = [
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n)
 
+
+
 function StatCard({ icon: Icon, iconBg, iconColor, label, value, change, changeType }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
@@ -63,7 +65,16 @@ function TransactionItem({ tx }) {
 }
 
 export default function Dashboard() {
-  const { transactions, getTotalIncome, getTotalExpense, getTotalBalance } = useFinanceStore()
+  const { transactions, getTotalIncome, getTotalExpense, getTotalBalance, loading } = useFinanceStore()
+
+if (loading) return (
+  <div className="flex items-center justify-center h-full">
+    <svg className="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+    </svg>
+  </div>
+)
   const { user } = useAuthStore()
 
   const totalBalance = getTotalBalance()

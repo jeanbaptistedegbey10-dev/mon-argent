@@ -1,116 +1,221 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { supabase } from '../lib/supabase'
 
-const useFinanceStore = create(
-  persist(
-    (set, get) => ({
-      transactions: [
-        { id: 1, name: 'Salaire Mars', cat: 'Salaire', icon: '💼', type: 'income',  amount: 320000, date: '2025-03-25', account: 'Compte principal', note: '' },
-        { id: 2, name: 'Courses Marché', cat: 'Alimentation', icon: '🛒', type: 'expense', amount: 24500, date: '2025-03-25', account: 'Espèces', note: '' },
-        { id: 3, name: 'Abonnement Bus', cat: 'Transport', icon: '🚌', type: 'expense', amount: 12000, date: '2025-03-24', account: 'Compte principal', note: '' },
-        { id: 4, name: 'Restaurant',     cat: 'Loisirs', icon: '🍽️', type: 'expense', amount: 18500, date: '2025-03-23', account: 'Carte crédit', note: '' },
-        { id: 5, name: 'Loyer',          cat: 'Logement', icon: '🏠', type: 'expense', amount: 85000, date: '2025-03-22', account: 'Compte principal', note: '' },
-        { id: 6, name: 'Freelance Web',  cat: 'Salaire', icon: '💻', type: 'income',  amount: 45000, date: '2025-03-20', account: 'Compte principal', note: '' },
-      ],
+const useFinanceStore = create((set, get) => ({
+  transactions: [],
+  accounts:     [],
+  categories:   [],
+  budgets:      [],
+  loading:      false,
 
-      accounts: [
-        { id: 1, name: 'Compte principal', type: 'Compte bancaire', icon: '🏦', balance: 287500, color: '#2563EB' },
-        { id: 2, name: 'Espèces',          type: 'Liquide',         icon: '💵', balance: 42000,  color: '#10B981' },
-        { id: 3, name: 'Carte crédit',     type: 'Carte de crédit', icon: '💳', balance: -15050, color: '#EF4444' },
-      ],
+  // ── INIT : charger toutes les données ──────────────────────
+  init: async () => {
+    set({ loading: true })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return set({ loading: false })
 
-      categories: [
-        { id: 1, name: 'Alimentation', icon: '🛒', color: '#2563EB', bg: '#EFF6FF' },
-        { id: 2, name: 'Transport',    icon: '🚗', color: '#10B981', bg: '#ECFDF5' },
-        { id: 3, name: 'Logement',     icon: '🏠', color: '#F59E0B', bg: '#FFFBEB' },
-        { id: 4, name: 'Loisirs',      icon: '🎭', color: '#EF4444', bg: '#FEF2F2' },
-        { id: 5, name: 'Salaire',      icon: '💼', color: '#8B5CF6', bg: '#F5F3FF' },
-        { id: 6, name: 'Santé',        icon: '💊', color: '#EC4899', bg: '#FDF2F8' },
-      ],
+    const [tx, acc, cat, bud] = await Promise.all([
+      supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+      supabase.from('accounts').select('*').eq('user_id', user.id).order('created_at'),
+      supabase.from('categories').select('*').eq('user_id', user.id).order('created_at'),
+      supabase.from('budgets').select('*').eq('user_id', user.id).order('created_at'),
+    ])
 
-      budgets: [
-        { id: 1, name: 'Alimentation', icon: '🛒', color: '#2563EB', spent: 55500,  limit: 80000 },
-        { id: 2, name: 'Transport',    icon: '🚗', color: '#10B981', spent: 34000,  limit: 30000 },
-        { id: 3, name: 'Logement',     icon: '🏠', color: '#F59E0B', spent: 85000,  limit: 90000 },
-        { id: 4, name: 'Loisirs',      icon: '🎭', color: '#EF4444', spent: 23000,  limit: 28000 },
-        { id: 5, name: 'Santé',        icon: '💊', color: '#EC4899', spent: 8200,   limit: 20000 },
-      ],
+    // Si première connexion : insérer données par défaut
+    if (cat.data?.length === 0) await get().seedDefaultData(user.id)
 
-      // --- Actions Transactions ---
-      addTransaction: (tx) => set((state) => ({
-        transactions: [{ ...tx, id: Date.now() }, ...state.transactions]
-      })),
+    set({
+      transactions: tx.data  || [],
+      accounts:     acc.data || [],
+      categories:   cat.data || [],
+      budgets:      bud.data || [],
+      loading: false,
+    })
+  },
 
-      deleteTransaction: (id) => set((state) => ({
-        transactions: state.transactions.filter(t => t.id !== id)
-      })),
+  // ── SEED : données par défaut à la première connexion ──────
+  seedDefaultData: async (userId) => {
+    const defaultCategories = [
+      { user_id: userId, name: 'Alimentation', icon: '🛒', color: '#2563EB', bg: '#EFF6FF' },
+      { user_id: userId, name: 'Transport',    icon: '🚗', color: '#10B981', bg: '#ECFDF5' },
+      { user_id: userId, name: 'Logement',     icon: '🏠', color: '#F59E0B', bg: '#FFFBEB' },
+      { user_id: userId, name: 'Loisirs',      icon: '🎭', color: '#EF4444', bg: '#FEF2F2' },
+      { user_id: userId, name: 'Salaire',      icon: '💼', color: '#8B5CF6', bg: '#F5F3FF' },
+      { user_id: userId, name: 'Santé',        icon: '💊', color: '#EC4899', bg: '#FDF2F8' },
+    ]
+    const defaultAccounts = [
+      { user_id: userId, name: 'Compte principal', type: 'Compte bancaire', icon: '🏦', color: '#2563EB', balance: 0 },
+      { user_id: userId, name: 'Espèces',           type: 'Liquide',         icon: '💵', color: '#10B981', balance: 0 },
+    ]
+    const { data: cats } = await supabase.from('categories').insert(defaultCategories).select()
+    const { data: accs } = await supabase.from('accounts').insert(defaultAccounts).select()
+    set({ categories: cats || [], accounts: accs || [] })
+  },
 
-      updateTransaction: (id, updated) => set((state) => ({
-        transactions: state.transactions.map(t => t.id === id ? { ...t, ...updated } : t)
-      })),
+  // ── TRANSACTIONS ────────────────────────────────────────────
+  addTransaction: async (tx) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert({ ...tx, user_id: user.id })
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({ transactions: [data, ...state.transactions] }))
 
-      // --- Getters calculés ---
-      getTotalIncome: () => {
-        const { transactions } = get()
-        return transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
-      },
+    // Mettre à jour le solde du compte
+    const account = get().accounts.find(a => a.name === tx.account)
+    if (account) {
+      const delta = tx.type === 'income' ? tx.amount : -tx.amount
+      await get().updateAccountBalance(account.id, account.balance + delta)
+    }
+  },
 
-      getTotalExpense: () => {
-        const { transactions } = get()
-        return transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
-      },
+  deleteTransaction: async (id) => {
+    // Récupérer la transaction avant suppression pour inverser le solde
+    const tx = get().transactions.find(t => t.id === id)
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) throw error
+    set(state => ({ transactions: state.transactions.filter(t => t.id !== id) }))
 
-      getTotalBalance: () => {
-        const { accounts } = get()
-        return accounts.reduce((sum, a) => sum + a.balance, 0)
-      },
+    // Inverser l'effet sur le solde du compte
+    if (tx) {
+      const account = get().accounts.find(a => a.name === tx.account)
+      if (account) {
+        const delta = tx.type === 'income' ? -tx.amount : tx.amount
+        await get().updateAccountBalance(account.id, account.balance + delta)
+      }
+    }
+  },
 
-      // --- Actions Budgets ---
-addBudget: (budget) => set((state) => ({
-  budgets: [...state.budgets, { ...budget, id: Date.now() }]
-})),
+  updateTransaction: async (id, updated) => {
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(updated)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({
+      transactions: state.transactions.map(t => t.id === id ? data : t)
+    }))
+  },
 
-updateBudget: (id, updated) => set((state) => ({
-  budgets: state.budgets.map(b => b.id === id ? { ...b, ...updated } : b)
-})),
+  // ── ACCOUNTS ────────────────────────────────────────────────
+  addAccount: async (account) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert({ ...account, user_id: user.id })
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({ accounts: [...state.accounts, data] }))
+  },
 
-deleteBudget: (id) => set((state) => ({
-  budgets: state.budgets.filter(b => b.id !== id)
-})),
+  updateAccount: async (id, updated) => {
+    const { data, error } = await supabase
+      .from('accounts')
+      .update(updated)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({
+      accounts: state.accounts.map(a => a.id === id ? data : a)
+    }))
+  },
 
-      // --- Actions Accounts ---
-addAccount: (account) => set((state) => ({
-  accounts: [...state.accounts, { ...account, id: Date.now() }]
-})),
+  updateAccountBalance: async (id, newBalance) => {
+    const { data, error } = await supabase
+      .from('accounts')
+      .update({ balance: newBalance })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({
+      accounts: state.accounts.map(a => a.id === id ? data : a)
+    }))
+  },
 
-updateAccount: (id, updated) => set((state) => ({
-  accounts: state.accounts.map(a => a.id === id ? { ...a, ...updated } : a)
-})),
+  deleteAccount: async (id) => {
+    const { error } = await supabase.from('accounts').delete().eq('id', id)
+    if (error) throw error
+    set(state => ({ accounts: state.accounts.filter(a => a.id !== id) }))
+  },
 
-deleteAccount: (id) => set((state) => ({
-  accounts: state.accounts.filter(a => a.id !== id)
-})),
+  // ── CATEGORIES ──────────────────────────────────────────────
+  addCategory: async (cat) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ ...cat, user_id: user.id })
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({ categories: [...state.categories, data] }))
+  },
 
-// --- Actions Categories ---
-addCategory: (cat) => set((state) => ({
-  categories: [...state.categories, { ...cat, id: Date.now() }]
-})),
+  updateCategory: async (id, updated) => {
+    const { data, error } = await supabase
+      .from('categories')
+      .update(updated)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({
+      categories: state.categories.map(c => c.id === id ? data : c)
+    }))
+  },
 
-updateCategory: (id, updated) => set((state) => ({
-  categories: state.categories.map(c => c.id === id ? { ...c, ...updated } : c)
-})),
+  deleteCategory: async (id) => {
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) throw error
+    set(state => ({ categories: state.categories.filter(c => c.id !== id) }))
+  },
 
-deleteCategory: (id) => set((state) => ({
-  categories: state.categories.filter(c => c.id !== id)
-})),
+  // ── BUDGETS ─────────────────────────────────────────────────
+  addBudget: async (budget) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from('budgets')
+      .insert({ ...budget, user_id: user.id })
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({ budgets: [...state.budgets, data] }))
+  },
 
+  updateBudget: async (id, updated) => {
+    const { data, error } = await supabase
+      .from('budgets')
+      .update(updated)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    set(state => ({
+      budgets: state.budgets.map(b => b.id === id ? data : b)
+    }))
+  },
 
-    }),
-    { name: 'finance-storage' }
-  )
+  deleteBudget: async (id) => {
+    const { error } = await supabase.from('budgets').delete().eq('id', id)
+    if (error) throw error
+    set(state => ({ budgets: state.budgets.filter(b => b.id !== id) }))
+  },
 
-  
-)
+  // ── GETTERS ─────────────────────────────────────────────────
+  getTotalIncome: () =>
+    get().transactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
+
+  getTotalExpense: () =>
+    get().transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+
+  getTotalBalance: () =>
+    get().accounts.reduce((s, a) => s + Number(a.balance), 0),
+}))
 
 export default useFinanceStore
-

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import useFinanceStore from './useFinanceStore'
 
 const useAuthStore = create((set) => ({
   user: null,
@@ -22,17 +23,19 @@ const useAuthStore = create((set) => ({
 
     // Écouter les changements de session
     supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        set({ user: profile, isAuthenticated: true })
-      } else {
-        set({ user: null, isAuthenticated: false })
-      }
-    })
+  if (session?.user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
+    set({ user: profile, isAuthenticated: true })
+    // Charger les données financières
+    await useFinanceStore.getState().init()
+  } else {
+    set({ user: null, isAuthenticated: false })
+  }
+})
   },
 
   login: async (email, password) => {
