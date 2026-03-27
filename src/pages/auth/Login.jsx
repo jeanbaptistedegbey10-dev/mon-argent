@@ -136,11 +136,7 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Compte de test */}
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
-          <p className="text-xs text-amber-700 font-medium">💡 Compte de test</p>
-          <p className="text-xs text-amber-600 mt-0.5">Email + mot de passe quelconques pour entrer</p>
-        </div>
+  
 
       </div>
     </div>

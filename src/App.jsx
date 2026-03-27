@@ -11,6 +11,8 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Calendar from './pages/Calendar'
 import useAuthStore from './store/useAuthStore'
+import ForgotPassword from './pages/auth/ForgotPassword'
+import ResetPassword  from './pages/auth/ResetPassword'
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuthStore()
@@ -32,8 +34,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login"    element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login"          element={<Login />} />
+        <Route path="/register"       element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
         <Route path="/" element={
           <PrivateRoute>
             <Layout />

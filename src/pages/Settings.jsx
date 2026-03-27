@@ -182,8 +182,8 @@ export default function Settings() {
                 <p className="text-xs text-gray-400 dark:text-gray-500">Dernière modification il y a 30 jours</p>
               </div>
             </div>
-            <button className="text-xs text-blue-600 font-medium hover:underline">
-              Modifier
+            <button onClick={() => navigate('/forgot-password')} className="text-xs text-blue-600 font-medium hover:underline">
+                  Modifier
             </button>
           </div>
         </div>
