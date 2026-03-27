@@ -77,11 +77,29 @@ if (loading) return (
 )
   const { user } = useAuthStore()
 
-  const totalBalance = getTotalBalance()
-  const totalIncome  = getTotalIncome()
-  const totalExpense = getTotalExpense()
-  const savings      = totalIncome - totalExpense
-  const savingsRate  = totalIncome > 0 ? ((savings / totalIncome) * 100).toFixed(1) : 0
+
+
+  // ── Calculs basés sur le mois en cours uniquement ──
+const now         = new Date()
+const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+const monthlyTransactions = transactions.filter(t => t.date.startsWith(monthPrefix))
+
+const totalIncome  = monthlyTransactions
+  .filter(t => t.type === 'income')
+  .reduce((s, t) => s + Number(t.amount), 0)
+
+const totalExpense = monthlyTransactions
+  .filter(t => t.type === 'expense')
+  .reduce((s, t) => s + Number(t.amount), 0)
+
+const totalBalance = getTotalBalance()
+
+// Épargne = revenus - dépenses, jamais négatif
+const savings     = Math.max(0, totalIncome - totalExpense)
+const savingsRate = totalIncome > 0
+  ? ((savings / totalIncome) * 100).toFixed(1)
+  : 0
 
   const recentTx = transactions.slice(0, 5)
 
@@ -136,15 +154,18 @@ if (loading) return (
           change="4.5% vs mois dernier"
           changeType="down"
         />
-        <StatCard
-          icon={PiggyBank}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-500"
-          label="Épargne nette"
-          value={`${fmt(savings)} F`}
-          change={`${savingsRate}% du revenu`}
-          changeType="up"
-        />
+        <StatCard icon={PiggyBank}
+            iconBg="bg-amber-50"
+            iconColor="text-amber-500"
+            label="Épargne nette"
+            value={`${fmt(savings)} F`}
+            change={
+    totalIncome === 0
+      ? 'Aucun revenu ce mois'
+      : `${savingsRate}% du revenu`
+  }
+  changeType="up"
+/>
       </div>
 
       {/* Graphiques */}

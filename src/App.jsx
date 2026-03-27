@@ -1,7 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import Layout from './components/layout/Layout'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import ForgotPassword from './pages/auth/ForgotPassword'
+import ResetPassword from './pages/auth/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Transactions from './pages/Transactions'
 import Accounts from './pages/Accounts'
@@ -11,11 +14,28 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Calendar from './pages/Calendar'
 import useAuthStore from './store/useAuthStore'
-import ForgotPassword from './pages/auth/ForgotPassword'
-import ResetPassword  from './pages/auth/ResetPassword'
+import { supabase } from './lib/supabase'
+
+// Composant qui surveille la session en continu
+function SessionWatcher() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
+        useAuthStore.setState({ user: null, isAuthenticated: false, loading: false })
+        navigate('/login', { replace: true })
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [navigate])
+
+  return null
+}
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuthStore()
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="flex flex-col items-center gap-3">
@@ -27,23 +47,26 @@ function PrivateRoute({ children }) {
       </div>
     </div>
   )
-  return isAuthenticated ? children : <Navigate to="/login" />
+
+  return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 
 export default function App() {
   return (
     <BrowserRouter>
+      <SessionWatcher />
       <Routes>
-        <Route path="/login"          element={<Login />} />
-        <Route path="/register"       element={<Register />} />
+        <Route path="/login"           element={<Login />} />
+        <Route path="/register"        element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
+
         <Route path="/" element={
           <PrivateRoute>
             <Layout />
           </PrivateRoute>
         }>
-          <Route index                element={<Navigate to="/dashboard" />} />
+          <Route index                element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard"     element={<Dashboard />} />
           <Route path="transactions"  element={<Transactions />} />
           <Route path="calendar"      element={<Calendar />} />
@@ -53,6 +76,15 @@ export default function App() {
           <Route path="reports"       element={<Reports />} />
           <Route path="settings"      element={<Settings />} />
         </Route>
+
+        {/* Page 404 */}
+        <Route path="*" element={
+          <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 gap-4">
+            <p className="text-6xl font-bold text-gray-200 dark:text-gray-800">404</p>
+            <p className="text-gray-500 text-sm">Page introuvable</p>
+            <Navigate to="/dashboard" replace />
+          </div>
+        } />
       </Routes>
     </BrowserRouter>
   )

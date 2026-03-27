@@ -7,35 +7,63 @@ const useAuthStore = create((set) => ({
   isAuthenticated: false,
   loading: true,
 
-  // Vérifier la session au démarrage
   init: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-      set({ user: profile, isAuthenticated: true, loading: false })
-    } else {
-      set({ loading: false })
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        set({ user: profile, isAuthenticated: true, loading: false })
+        await useFinanceStore.getState().init()
+      } else {
+        set({ user: null, isAuthenticated: false, loading: false })
+      }
+    } catch (err) {
+      console.error('Init error:', err)
+      set({ user: null, isAuthenticated: false, loading: false })
     }
 
-    // Écouter les changements de session
+    // Écouter TOUS les changements de session
     supabase.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
-    set({ user: profile, isAuthenticated: true })
-    // Charger les données financières
-    await useFinanceStore.getState().init()
-  } else {
-    set({ user: null, isAuthenticated: false })
-  }
-})
+      console.log('Auth event:', event)
+
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
+        set({ user: null, isAuthenticated: false, loading: false })
+        return
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+            set({ user: profile, isAuthenticated: true, loading: false })
+            await useFinanceStore.getState().init()
+          } catch (err) {
+            console.error('Profile fetch error:', err)
+            set({ user: null, isAuthenticated: false, loading: false })
+          }
+        }
+      }
+
+      if (event === 'SIGNED_OUT') {
+        set({ user: null, isAuthenticated: false, loading: false })
+        useFinanceStore.setState({
+          transactions: [],
+          accounts: [],
+          categories: [],
+          budgets: [],
+        })
+      }
+    })
   },
 
   login: async (email, password) => {
@@ -57,6 +85,12 @@ const useAuthStore = create((set) => ({
   logout: async () => {
     await supabase.auth.signOut()
     set({ user: null, isAuthenticated: false })
+    useFinanceStore.setState({
+      transactions: [],
+      accounts: [],
+      categories: [],
+      budgets: [],
+    })
   },
 
   updateProfile: async (updates) => {

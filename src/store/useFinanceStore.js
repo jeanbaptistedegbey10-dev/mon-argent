@@ -180,8 +180,9 @@ const useFinanceStore = create((set, get) => ({
   // Calcule le montant dépensé par catégorie depuis les vraies transactions
 getSpentByCategory: () => {
   const { transactions } = get()
+  const monthPrefix = new Date().toISOString().slice(0, 7)
   return transactions
-    .filter(t => t.type === 'expense')
+    .filter(t => t.type === 'expense' && t.date.startsWith(monthPrefix))
     .reduce((acc, t) => {
       acc[t.cat] = (acc[t.cat] || 0) + Number(t.amount)
       return acc
@@ -220,14 +221,26 @@ getSpentByCategory: () => {
   },
 
   // ── GETTERS ─────────────────────────────────────────────────
-  getTotalIncome: () =>
-    get().transactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
+  getTotalIncome: () => {
+  const { transactions } = get()
+  const monthPrefix = new Date().toISOString().slice(0, 7)
+  return transactions
+    .filter(t => t.type === 'income' && t.date.startsWith(monthPrefix))
+    .reduce((s, t) => s + Number(t.amount), 0)
+},
 
-  getTotalExpense: () =>
-    get().transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+getTotalExpense: () => {
+  const { transactions } = get()
+  const monthPrefix = new Date().toISOString().slice(0, 7)
+  return transactions
+    .filter(t => t.type === 'expense' && t.date.startsWith(monthPrefix))
+    .reduce((s, t) => s + Number(t.amount), 0)
+},
 
-  getTotalBalance: () =>
-    get().accounts.reduce((s, a) => s + Number(a.balance), 0),
+getTotalBalance: () => {
+  const { accounts } = get()
+  return accounts.reduce((s, a) => s + Number(a.balance), 0)
+},
 }))
 
 export default useFinanceStore
