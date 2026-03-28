@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import Sidebar from './Sidebar'
+import BudgetNotifications from '../ui/BudgetNotification'
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -9,7 +10,6 @@ export default function Layout() {
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
 
-      {/* Overlay mobile */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-20 lg:hidden"
@@ -17,7 +17,6 @@ export default function Layout() {
         />
       )}
 
-      {/* Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-30 lg:static lg:z-auto
         transition-transform duration-300 ease-in-out
@@ -26,10 +25,7 @@ export default function Layout() {
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
 
-      {/* Contenu principal */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-        {/* Header mobile */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -45,6 +41,10 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Notifications budget */}
+      <BudgetNotifications />
+
     </div>
   )
 }

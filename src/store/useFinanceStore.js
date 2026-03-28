@@ -8,9 +8,17 @@ const useFinanceStore = create((set, get) => ({
   budgets:      [],
   loading:      false,
 
-  // ── INIT : charger toutes les données ──────────────────────
+  // ── INIT ─────────────────────────────────────────────────────
   init: async () => {
     set({ loading: true })
+
+    // Nettoyer les notifications du mois précédent
+    const now         = new Date()
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const dismissed   = JSON.parse(localStorage.getItem('dismissed-notifs') || '[]')
+    const filtered    = dismissed.filter(id => id.includes(monthPrefix))
+    localStorage.setItem('dismissed-notifs', JSON.stringify(filtered))
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return set({ loading: false })
 
@@ -21,20 +29,21 @@ const useFinanceStore = create((set, get) => ({
       supabase.from('budgets').select('*').eq('user_id', user.id).order('created_at'),
     ])
 
-    // Si première connexion : insérer données par défaut
+    // Première connexion : insérer données par défaut
     if (cat.data?.length === 0 && acc.data?.length === 0) {
-  await get().seedDefaultData(user.id)
-}
+      await get().seedDefaultData(user.id)
+    }
+
     set({
       transactions: tx.data  || [],
       accounts:     acc.data || [],
       categories:   cat.data || [],
       budgets:      bud.data || [],
-      loading: false,
+      loading:      false,
     })
   },
 
-  // ── SEED : données par défaut à la première connexion ──────
+  // ── SEED données par défaut ───────────────────────────────────
   seedDefaultData: async (userId) => {
     const defaultCategories = [
       { user_id: userId, name: 'Alimentation', icon: '🛒', color: '#2563EB', bg: '#EFF6FF' },
@@ -48,12 +57,14 @@ const useFinanceStore = create((set, get) => ({
       { user_id: userId, name: 'Compte principal', type: 'Compte bancaire', icon: '🏦', color: '#2563EB', balance: 0 },
       { user_id: userId, name: 'Espèces',           type: 'Liquide',         icon: '💵', color: '#10B981', balance: 0 },
     ]
+
     const { data: cats } = await supabase.from('categories').insert(defaultCategories).select()
     const { data: accs } = await supabase.from('accounts').insert(defaultAccounts).select()
+
     set({ categories: cats || [], accounts: accs || [] })
   },
 
-  // ── TRANSACTIONS ────────────────────────────────────────────
+  // ── TRANSACTIONS ──────────────────────────────────────────────
   addTransaction: async (tx) => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
@@ -62,29 +73,36 @@ const useFinanceStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
-    set(state => ({ transactions: [data, ...state.transactions] }))
+
+    set(state => ({
+      transactions: [data, ...state.transactions]
+    }))
 
     // Mettre à jour le solde du compte
     const account = get().accounts.find(a => a.name === tx.account)
     if (account) {
-      const delta = tx.type === 'income' ? tx.amount : -tx.amount
-      await get().updateAccountBalance(account.id, account.balance + delta)
+      const delta = tx.type === 'income' ? Number(tx.amount) : -Number(tx.amount)
+      await get().updateAccountBalance(account.id, Number(account.balance) + delta)
     }
   },
 
   deleteTransaction: async (id) => {
     // Récupérer la transaction avant suppression pour inverser le solde
     const tx = get().transactions.find(t => t.id === id)
+
     const { error } = await supabase.from('transactions').delete().eq('id', id)
     if (error) throw error
-    set(state => ({ transactions: state.transactions.filter(t => t.id !== id) }))
+
+    set(state => ({
+      transactions: state.transactions.filter(t => t.id !== id)
+    }))
 
     // Inverser l'effet sur le solde du compte
     if (tx) {
       const account = get().accounts.find(a => a.name === tx.account)
       if (account) {
-        const delta = tx.type === 'income' ? -tx.amount : tx.amount
-        await get().updateAccountBalance(account.id, account.balance + delta)
+        const delta = tx.type === 'income' ? -Number(tx.amount) : Number(tx.amount)
+        await get().updateAccountBalance(account.id, Number(account.balance) + delta)
       }
     }
   },
@@ -97,12 +115,13 @@ const useFinanceStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
+
     set(state => ({
       transactions: state.transactions.map(t => t.id === id ? data : t)
     }))
   },
 
-  // ── ACCOUNTS ────────────────────────────────────────────────
+  // ── ACCOUNTS ──────────────────────────────────────────────────
   addAccount: async (account) => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
@@ -111,7 +130,10 @@ const useFinanceStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
-    set(state => ({ accounts: [...state.accounts, data] }))
+
+    set(state => ({
+      accounts: [...state.accounts, data]
+    }))
   },
 
   updateAccount: async (id, updated) => {
@@ -122,6 +144,7 @@ const useFinanceStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
+
     set(state => ({
       accounts: state.accounts.map(a => a.id === id ? data : a)
     }))
@@ -135,6 +158,7 @@ const useFinanceStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
+
     set(state => ({
       accounts: state.accounts.map(a => a.id === id ? data : a)
     }))
@@ -143,10 +167,13 @@ const useFinanceStore = create((set, get) => ({
   deleteAccount: async (id) => {
     const { error } = await supabase.from('accounts').delete().eq('id', id)
     if (error) throw error
-    set(state => ({ accounts: state.accounts.filter(a => a.id !== id) }))
+
+    set(state => ({
+      accounts: state.accounts.filter(a => a.id !== id)
+    }))
   },
 
-  // ── CATEGORIES ──────────────────────────────────────────────
+  // ── CATEGORIES ────────────────────────────────────────────────
   addCategory: async (cat) => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
@@ -155,7 +182,10 @@ const useFinanceStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
-    set(state => ({ categories: [...state.categories, data] }))
+
+    set(state => ({
+      categories: [...state.categories, data]
+    }))
   },
 
   updateCategory: async (id, updated) => {
@@ -166,6 +196,7 @@ const useFinanceStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
+
     set(state => ({
       categories: state.categories.map(c => c.id === id ? data : c)
     }))
@@ -174,22 +205,13 @@ const useFinanceStore = create((set, get) => ({
   deleteCategory: async (id) => {
     const { error } = await supabase.from('categories').delete().eq('id', id)
     if (error) throw error
-    set(state => ({ categories: state.categories.filter(c => c.id !== id) }))
+
+    set(state => ({
+      categories: state.categories.filter(c => c.id !== id)
+    }))
   },
 
-  // Calcule le montant dépensé par catégorie depuis les vraies transactions
-getSpentByCategory: () => {
-  const { transactions } = get()
-  const monthPrefix = new Date().toISOString().slice(0, 7)
-  return transactions
-    .filter(t => t.type === 'expense' && t.date.startsWith(monthPrefix))
-    .reduce((acc, t) => {
-      acc[t.cat] = (acc[t.cat] || 0) + Number(t.amount)
-      return acc
-    }, {})
-},
-
-  // ── BUDGETS ─────────────────────────────────────────────────
+  // ── BUDGETS ───────────────────────────────────────────────────
   addBudget: async (budget) => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
@@ -198,7 +220,10 @@ getSpentByCategory: () => {
       .select()
       .single()
     if (error) throw error
-    set(state => ({ budgets: [...state.budgets, data] }))
+
+    set(state => ({
+      budgets: [...state.budgets, data]
+    }))
   },
 
   updateBudget: async (id, updated) => {
@@ -209,6 +234,7 @@ getSpentByCategory: () => {
       .select()
       .single()
     if (error) throw error
+
     set(state => ({
       budgets: state.budgets.map(b => b.id === id ? data : b)
     }))
@@ -217,30 +243,44 @@ getSpentByCategory: () => {
   deleteBudget: async (id) => {
     const { error } = await supabase.from('budgets').delete().eq('id', id)
     if (error) throw error
-    set(state => ({ budgets: state.budgets.filter(b => b.id !== id) }))
+
+    set(state => ({
+      budgets: state.budgets.filter(b => b.id !== id)
+    }))
   },
 
-  // ── GETTERS ─────────────────────────────────────────────────
+  // ── GETTERS ───────────────────────────────────────────────────
   getTotalIncome: () => {
-  const { transactions } = get()
-  const monthPrefix = new Date().toISOString().slice(0, 7)
-  return transactions
-    .filter(t => t.type === 'income' && t.date.startsWith(monthPrefix))
-    .reduce((s, t) => s + Number(t.amount), 0)
-},
+    const { transactions } = get()
+    const monthPrefix = new Date().toISOString().slice(0, 7)
+    return transactions
+      .filter(t => t.type === 'income' && t.date.startsWith(monthPrefix))
+      .reduce((s, t) => s + Number(t.amount), 0)
+  },
 
-getTotalExpense: () => {
-  const { transactions } = get()
-  const monthPrefix = new Date().toISOString().slice(0, 7)
-  return transactions
-    .filter(t => t.type === 'expense' && t.date.startsWith(monthPrefix))
-    .reduce((s, t) => s + Number(t.amount), 0)
-},
+  getTotalExpense: () => {
+    const { transactions } = get()
+    const monthPrefix = new Date().toISOString().slice(0, 7)
+    return transactions
+      .filter(t => t.type === 'expense' && t.date.startsWith(monthPrefix))
+      .reduce((s, t) => s + Number(t.amount), 0)
+  },
 
-getTotalBalance: () => {
-  const { accounts } = get()
-  return accounts.reduce((s, a) => s + Number(a.balance), 0)
-},
+  getTotalBalance: () => {
+    const { accounts } = get()
+    return accounts.reduce((s, a) => s + Number(a.balance), 0)
+  },
+
+  getSpentByCategory: () => {
+    const { transactions } = get()
+    const monthPrefix = new Date().toISOString().slice(0, 7)
+    return transactions
+      .filter(t => t.type === 'expense' && t.date.startsWith(monthPrefix))
+      .reduce((acc, t) => {
+        acc[t.cat] = (acc[t.cat] || 0) + Number(t.amount)
+        return acc
+      }, {})
+  },
 }))
 
 export default useFinanceStore
