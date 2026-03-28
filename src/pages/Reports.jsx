@@ -7,35 +7,32 @@ import {
 import useFinanceStore from '../store/useFinanceStore'
 import useAuthStore from '../store/useAuthStore'
 import { exportFinancialReport } from '../lib/exportPDF'
+import { PageSkeleton } from '../components/ui/Skeleton'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n)
 
 const PERIODS = [
-  { label: 'Ce mois',      months: 1  },
-  { label: '3 mois',       months: 3  },
-  { label: '6 mois',       months: 6  },
-  { label: 'Cette année',  months: 12 },
+  { label: 'Ce mois',     months: 1  },
+  { label: '3 mois',      months: 3  },
+  { label: '6 mois',      months: 6  },
+  { label: 'Cette année', months: 12 },
 ]
 
-// ── Helpers ───────────────────────────────────────────────────
 function getMonthsData(transactions, nbMonths) {
-  const now    = new Date()
-  const months = []
-
-  for (let i = nbMonths - 1; i >= 0; i--) {
-    const date   = new Date(now.getFullYear(), now.getMonth() - i, 1)
+  const now = new Date()
+  return Array.from({ length: nbMonths }, (_, i) => {
+    const date   = new Date(now.getFullYear(), now.getMonth() - (nbMonths - 1 - i), 1)
     const prefix = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    const label  = date.toLocaleDateString('fr-FR', { month: 'short', year: nbMonths > 6 ? '2-digit' : undefined })
-
-    const monthTx = transactions.filter(t => t.date.startsWith(prefix))
-
+    const label  = date.toLocaleDateString('fr-FR', {
+      month: 'short',
+      year: nbMonths > 6 ? '2-digit' : undefined
+    })
+    const monthTx  = transactions.filter(t => t.date.startsWith(prefix))
     const revenus  = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
     const depenses = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
     const epargne  = Math.max(0, revenus - depenses)
-
-    months.push({ mois: label, revenus, depenses, epargne })
-  }
-  return months
+    return { mois: label, revenus, depenses, epargne }
+  })
 }
 
 function getPeriodTransactions(transactions, nbMonths) {
@@ -48,64 +45,49 @@ function getCatData(transactions, categories) {
   const expenses = transactions.filter(t => t.type === 'expense')
   const total    = expenses.reduce((s, t) => s + Number(t.amount), 0)
   if (total === 0) return []
-
   const grouped = expenses.reduce((acc, t) => {
     acc[t.cat] = (acc[t.cat] || 0) + Number(t.amount)
     return acc
   }, {})
-
   return Object.entries(grouped)
     .map(([name, value]) => {
       const cat = categories.find(c => c.name === name)
-      return {
-        name,
-        value,
-        color: cat?.color || '#9CA3AF',
-        icon:  cat?.icon  || '💰',
-        pct:   Math.round((value / total) * 100),
-      }
+      return { name, value, color: cat?.color || '#9CA3AF', icon: cat?.icon || '💰', pct: Math.round((value / total) * 100) }
     })
     .sort((a, b) => b.value - a.value)
 }
 
-// ── Tooltip custom ────────────────────────────────────────────
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg">
       <p className="font-semibold text-gray-700 dark:text-gray-300 mb-1">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }}>
-          {p.name} : {fmt(p.value)} F
-        </p>
+        <p key={i} style={{ color: p.color }}>{p.name} : {fmt(p.value)} F</p>
       ))}
     </div>
   )
 }
 
-// ── Page ─────────────────────────────────────────────────────
 export default function Reports() {
-  const { transactions, categories, accounts, budgets } = useFinanceStore()
+  const { transactions, categories, accounts, budgets, loading } = useFinanceStore()
   const { user } = useAuthStore()
+  const [periodIdx, setPeriodIdx] = useState(0)
+  const [exporting, setExporting] = useState(false)
 
-  const [periodIdx,  setPeriodIdx]  = useState(0)
-  const [exporting,  setExporting]  = useState(false)
+  if (loading) return <PageSkeleton lines={5} />
 
   const period   = PERIODS[periodIdx]
-  const nbMonths = period.months
+  const periodTx = getPeriodTransactions(transactions, period.months)
 
-  // Transactions de la période
-  const periodTx = getPeriodTransactions(transactions, nbMonths)
-
-  // KPIs
   const totalIncome  = periodTx.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
   const totalExpense = periodTx.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
   const savings      = Math.max(0, totalIncome - totalExpense)
   const savingsRate  = totalIncome > 0 ? ((savings / totalIncome) * 100).toFixed(1) : 0
 
-  // Données graphiques
-  const monthlyData = getMonthsData(transactions, nbMonths)
+  const monthlyData = getMonthsData(transactions, period.months)
   const catData     = getCatData(periodTx, categories)
+  const isEmpty     = periodTx.length === 0
 
   const handleExportPDF = async () => {
     setExporting(true)
@@ -118,12 +100,9 @@ export default function Reports() {
     }
   }
 
-  const isEmpty = periodTx.length === 0
-
   return (
     <div className="p-6 max-w-5xl mx-auto">
 
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Rapports</h1>
@@ -142,9 +121,7 @@ export default function Reports() {
               </svg>
               Génération...
             </>
-          ) : (
-            <><Download size={16} /> Exporter PDF</>
-          )}
+          ) : <><Download size={16} /> Exporter PDF</>}
         </button>
       </div>
 
@@ -192,16 +169,10 @@ export default function Reports() {
           {/* Revenus vs Dépenses */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-800 dark:text-white">
-                Revenus vs Dépenses
-              </h2>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-white">Revenus vs Dépenses</h2>
               <div className="flex gap-3">
-                <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Revenus
-                </span>
-                <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-red-500" /> Dépenses
-                </span>
+                <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Revenus</span>
+                <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-2.5 h-2.5 rounded-sm bg-red-500" /> Dépenses</span>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={240}>
@@ -216,32 +187,20 @@ export default function Reports() {
             </ResponsiveContainer>
           </div>
 
-          {/* Donut + Épargne */}
+          {/* Donut + Ligne */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-
-            {/* Donut catégories */}
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-              <h2 className="text-sm font-semibold text-gray-800 dark:text-white mb-4">
-                Dépenses par catégorie
-              </h2>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-white mb-4">Dépenses par catégorie</h2>
               {catData.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-8">Aucune dépense sur cette période.</p>
               ) : (
                 <>
                   <ResponsiveContainer width="100%" height={180}>
                     <PieChart>
-                      <Pie
-                        data={catData}
-                        cx="50%" cy="50%"
-                        innerRadius={50} outerRadius={75}
-                        paddingAngle={3} dataKey="value"
-                      >
+                      <Pie data={catData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
                         {catData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                       </Pie>
-                      <Tooltip
-                        formatter={(v) => [`${fmt(v)} F`, '']}
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }}
-                      />
+                      <Tooltip formatter={(v) => [`${fmt(v)} F`, '']} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-2 mt-2">
@@ -258,26 +217,15 @@ export default function Reports() {
               )}
             </div>
 
-            {/* Évolution épargne */}
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-              <h2 className="text-sm font-semibold text-gray-800 dark:text-white mb-4">
-                Évolution de l'épargne
-              </h2>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-white mb-4">Évolution de l'épargne</h2>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                   <XAxis dataKey="mois" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => v === 0 ? '0' : `${Math.round(v/1000)}k`} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line
-                    type="monotone"
-                    dataKey="epargne"
-                    name="Épargne"
-                    stroke="#2563EB"
-                    strokeWidth={2.5}
-                    dot={{ fill: '#2563EB', r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
+                  <Line type="monotone" dataKey="epargne" name="Épargne" stroke="#2563EB" strokeWidth={2.5} dot={{ fill: '#2563EB', r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

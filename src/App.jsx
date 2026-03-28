@@ -15,6 +15,7 @@ import Settings from './pages/Settings'
 import Calendar from './pages/Calendar'
 import useAuthStore from './store/useAuthStore'
 import { supabase } from './lib/supabase'
+import NotFound from './pages/NotFound'
 
 // Composant qui surveille la session en continu
 function SessionWatcher() {
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="categories"    element={<Categories />} />
           <Route path="reports"       element={<Reports />} />
           <Route path="settings"      element={<Settings />} />
+          <Route path="*" element={<NotFound />} />
         </Route>
 
         {/* Page 404 */}

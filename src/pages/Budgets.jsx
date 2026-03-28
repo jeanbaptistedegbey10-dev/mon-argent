@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Plus, X, Check, Pencil, Trash2, AlertTriangle, TrendingUp } from 'lucide-react'
 import useFinanceStore from '../store/useFinanceStore'
+import { PageSkeleton } from '../components/ui/Skeleton'
 
 const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n)
 
-// ── Modal ─────────────────────────────────────────────────────
 function BudgetModal({ onClose, existing }) {
-  const { categories } = useFinanceStore()
+  const { categories, addBudget, updateBudget } = useFinanceStore()
 
   const [form, setForm] = useState({
     name:  existing?.name  || '',
@@ -14,32 +14,27 @@ function BudgetModal({ onClose, existing }) {
     icon:  existing?.icon  || '💰',
     color: existing?.color || '#2563EB',
   })
-  const [error, setError] = useState('')
+  const [error,  setError]  = useState('')
   const [saving, setSaving] = useState(false)
 
   const handleCatSelect = (cat) => {
     setForm({ ...form, name: cat.name, icon: cat.icon, color: cat.color })
+    setError('')
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.name.trim()) return setError('Choisissez une catégorie.')
+    if (!form.name.trim())
+      return setError('Choisissez une catégorie.')
     if (!form.limit || Number(form.limit) <= 0)
       return setError('Veuillez saisir un montant limite valide.')
 
     setSaving(true)
     try {
-      const store = useFinanceStore.getState()
       if (existing) {
-        await store.updateBudget(existing.id, {
-          ...form, limit: Number(form.limit)
-        })
+        await updateBudget(existing.id, { ...form, limit: Number(form.limit) })
       } else {
-        await store.addBudget({
-          ...form,
-          limit: Number(form.limit),
-          spent: 0,
-        })
+        await addBudget({ ...form, limit: Number(form.limit), spent: 0 })
       }
       onClose()
     } catch (err) {
@@ -65,8 +60,6 @@ function BudgetModal({ onClose, existing }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-
-          {/* Sélection catégorie */}
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
               Catégorie
@@ -90,14 +83,12 @@ function BudgetModal({ onClose, existing }) {
             </div>
           </div>
 
-          {/* Montant limite */}
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
               Limite mensuelle (FCFA)
             </label>
             <input
               type="number"
-              name="limit"
               value={form.limit}
               onChange={(e) => setForm({ ...form, limit: e.target.value })}
               placeholder="Ex: 80000"
@@ -106,7 +97,6 @@ function BudgetModal({ onClose, existing }) {
             />
           </div>
 
-          {/* Aperçu */}
           {form.name && form.limit && (
             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <div className="flex items-center justify-between text-xs mb-2">
@@ -115,21 +105,21 @@ function BudgetModal({ onClose, existing }) {
                 </span>
                 <span className="text-gray-400">0 / {fmt(Number(form.limit))} FCFA</span>
               </div>
-              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
-                <div className="h-full w-0 bg-blue-500 rounded-full" />
-              </div>
+              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full" />
             </div>
           )}
 
           {error && (
-            <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+              {error}
+            </p>
           )}
 
           <div className="flex gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="flex-1 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               Annuler
             </button>
@@ -153,15 +143,14 @@ function BudgetModal({ onClose, existing }) {
   )
 }
 
-// ── Carte Budget ──────────────────────────────────────────────
 function BudgetCard({ budget, spent, onEdit, onDelete }) {
   const pct     = budget.limit > 0 ? Math.min(100, Math.round((spent / budget.limit) * 100)) : 0
   const over    = spent > budget.limit
   const warning = pct >= 80 && !over
   const remain  = budget.limit - spent
 
-  const barColor   = over ? '#EF4444' : warning ? '#F59E0B' : '#10B981'
-  const statusBg   = over
+  const barColor = over ? '#EF4444' : warning ? '#F59E0B' : '#10B981'
+  const statusBg = over
     ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
     : warning
       ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
@@ -169,7 +158,6 @@ function BudgetCard({ budget, spent, onEdit, onDelete }) {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 hover:border-gray-300 dark:hover:border-gray-700 transition-colors">
-
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div
@@ -186,20 +174,19 @@ function BudgetCard({ budget, spent, onEdit, onDelete }) {
         <div className="flex gap-1.5">
           <button
             onClick={() => onEdit(budget)}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
           >
             <Pencil size={14} />
           </button>
           <button
             onClick={() => onDelete(budget.id)}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
           >
             <Trash2 size={14} />
           </button>
         </div>
       </div>
 
-      {/* Montants — spent calculé dynamiquement */}
       <div className="flex items-end justify-between mb-2">
         <div>
           <span className="text-xl font-bold text-gray-900 dark:text-white">{fmt(spent)}</span>
@@ -210,7 +197,6 @@ function BudgetCard({ budget, spent, onEdit, onDelete }) {
         </span>
       </div>
 
-      {/* Barre */}
       <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-3">
         <div
           className="h-full rounded-full transition-all duration-500"
@@ -218,7 +204,6 @@ function BudgetCard({ budget, spent, onEdit, onDelete }) {
         />
       </div>
 
-      {/* Statut */}
       <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ${statusBg}`}>
         {over ? (
           <><AlertTriangle size={12} /> Dépassé de {fmt(spent - budget.limit)} FCFA</>
@@ -232,26 +217,24 @@ function BudgetCard({ budget, spent, onEdit, onDelete }) {
   )
 }
 
-// ── Page principale ───────────────────────────────────────────
 export default function Budgets() {
-  const { budgets, deleteBudget, getSpentByCategory } = useFinanceStore()
-  const [showModal, setShowModal] = useState(false)
+  const { budgets, deleteBudget, getSpentByCategory, loading } = useFinanceStore()
+  const [showModal,  setShowModal]  = useState(false)
   const [editTarget, setEditTarget] = useState(null)
 
-  // Dépenses calculées depuis les vraies transactions
+  if (loading) return <PageSkeleton lines={4} />
+
   const spentByCategory = getSpentByCategory()
-
-  const handleEdit  = (b) => { setEditTarget(b); setShowModal(true) }
-  const handleClose = () =>  { setShowModal(false); setEditTarget(null) }
-
   const totalBudget = budgets.reduce((s, b) => s + Number(b.limit), 0)
   const totalSpent  = budgets.reduce((s, b) => s + (spentByCategory[b.name] || 0), 0)
   const globalPct   = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
+  const handleEdit  = (b) => { setEditTarget(b); setShowModal(true) }
+  const handleClose = () =>  { setShowModal(false); setEditTarget(null) }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
 
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Budgets</h1>
@@ -261,8 +244,7 @@ export default function Budgets() {
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
-          <Plus size={16} />
-          Nouveau budget
+          <Plus size={16} /> Nouveau budget
         </button>
       </div>
 
@@ -279,9 +261,12 @@ export default function Budgets() {
             </p>
           </div>
           <span className={`text-sm font-bold px-3 py-1 rounded-full
-            ${globalPct >= 100 ? 'bg-red-50 text-red-600'
-            : globalPct >= 80  ? 'bg-amber-50 text-amber-600'
-            :                    'bg-emerald-50 text-emerald-600'}`}>
+            ${globalPct >= 100
+              ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+              : globalPct >= 80
+                ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
+                : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'
+            }`}>
             {globalPct}% utilisé
           </span>
         </div>
@@ -296,7 +281,7 @@ export default function Budgets() {
         </div>
       </div>
 
-      {/* Grille budgets */}
+      {/* Grille */}
       {budgets.length === 0 ? (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center">
           <p className="text-gray-400 text-sm mb-3">Aucun budget configuré.</p>
