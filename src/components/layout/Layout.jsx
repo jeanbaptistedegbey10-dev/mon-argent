@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import Sidebar from './Sidebar'
 import BudgetNotifications from '../ui/BudgetNotification'
+import InstallPWA from '../ui/InstallPWA'
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -44,7 +45,7 @@ export default function Layout() {
 
       {/* Notifications budget */}
       <BudgetNotifications />
-
+       <InstallPWA />
     </div>
   )
 }

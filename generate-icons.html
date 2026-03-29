@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<body style="background:#f3f4f6;display:flex;gap:20px;padding:20px;flex-wrap:wrap;">
+
+<script>
+function makeIcon(size) {
+  const canvas = document.createElement('canvas')
+  canvas.width  = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+
+  // Fond bleu arrondi
+  const radius = size * 0.22
+  ctx.fillStyle = '#2563EB'
+  ctx.beginPath()
+  ctx.moveTo(radius, 0)
+  ctx.lineTo(size - radius, 0)
+  ctx.quadraticCurveTo(size, 0, size, radius)
+  ctx.lineTo(size, size - radius)
+  ctx.quadraticCurveTo(size, size, size - radius, size)
+  ctx.lineTo(radius, size)
+  ctx.quadraticCurveTo(0, size, 0, size - radius)
+  ctx.lineTo(0, radius)
+  ctx.quadraticCurveTo(0, 0, radius, 0)
+  ctx.closePath()
+  ctx.fill()
+
+  // Cercle blanc
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'
+  ctx.beginPath()
+  ctx.arc(size * 0.72, size * 0.28, size * 0.28, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Texte M
+  ctx.fillStyle = 'white'
+  ctx.font = `bold ${size * 0.38}px Arial`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('M', size / 2, size * 0.44)
+
+  // Texte FCFA
+  ctx.font = `bold ${size * 0.14}px Arial`
+  ctx.fillText('FCFA', size / 2, size * 0.70)
+
+  return canvas
+}
+
+[192, 512].forEach(size => {
+  const canvas = makeIcon(size)
+  document.body.appendChild(canvas)
+
+  const link = document.createElement('a')
+  link.download = `pwa-${size}x${size}.png`
+  link.href = canvas.toDataURL('image/png')
+  link.textContent = `⬇ Télécharger ${size}x${size}`
+  link.style = 'display:block;margin:8px 0;color:#2563EB;font-family:sans-serif;'
+  document.body.appendChild(link)
+})
+</script>
+</body>
+</html>
